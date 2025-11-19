@@ -1,0 +1,255 @@
+<!DOCTYPE html><html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GustoLabs IDE</title>  <style>
+    body {
+      margin: 0;
+      background: #1e1e1e;
+      color: #fff;
+      font-family: "Segoe UI", sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #topbar {
+      height: 45px;
+      background: #2d2d2d;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 14px;
+      border-bottom: 1px solid #444;
+      user-select: none;
+    }
+
+    #topbar button {
+      background: #0e7afe;
+      border: none;
+      padding: 6px 16px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: bold;
+      border-radius: 6px;
+      transition: 0.2s;
+    }
+
+    #topbar button:hover {
+      background: #0b63c4;
+    }
+
+    #container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      grid-template-rows: 1fr 180px;
+      grid-template-areas:
+        "sidebar editor"
+        "terminal terminal";
+    }
+
+    #sidebar {
+      grid-area: sidebar;
+      background: #252526;
+      border-right: 1px solid #3c3c3c;
+      padding: 12px;
+      overflow-y: auto;
+    }
+
+    #fileList li {
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      transition: 0.2s;
+    }
+
+    #fileList li:hover {
+      background: #3a3a3a;
+    }
+
+    #editor {
+      grid-area: editor;
+      width: 100%;
+      height: 100%;
+    }
+
+    #terminal {
+      grid-area: terminal;
+      background: #111;
+      border-top: 1px solid #333;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 14px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    #previewFrame {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 400px;
+      height: 300px;
+      border: 1px solid #555;
+      background: white;
+      display: none;
+    }
+  </style></head>
+<body>
+  <div id="topbar">
+    <button id="runBtn">▶️ Rodar</button>
+    <button id="newFileBtn">📄 Novo Arquivo</button>
+    <button id="saveBtn">💾 Salvar</button>
+    <span>GustoLabs IDE PRO</span>
+  </div>  <div id="container">
+    <div id="sidebar">
+      <h3>Arquivos</h3>
+      <ul id="fileList"></ul>
+    </div><div id="editor"></div>
+
+<div id="terminal" contenteditable="true"></div>
+
+  </div>  <iframe id="previewFrame"></iframe>  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>  <script>
+    // =============================
+    // CONFIGURAÇÃO DO MONACO
+    // =============================
+    require.config({
+      paths: {
+        vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs"
+      }
+    });
+
+    let currentFile = "main.js";
+
+    require(["vs/editor/editor.main"], function () {
+      window.editor = monaco.editor.create(document.getElementById("editor"), {
+        value: "// Bem-vindo ao GustoLabs IDE PRO!
+console.log('Olá Augusto!');",
+        language: "javascript",
+        theme: "vs-dark",
+        automaticLayout: true,
+        minimap: { enabled: true }
+      });
+    });
+
+    // =============================
+    // SISTEMA DE ARQUIVOS VIRTUAL
+    // =============================
+    const fs = {
+      files: {
+        "main.js": "console.log('Olá Augusto! 😄');"
+      },
+
+      save(name, code) {
+        this.files[name] = code;
+        renderFiles();
+      },
+
+      get(name) {
+        return this.files[name];
+      }
+    };
+
+    // =============================
+    // ATUALIZA LISTA DE ARQUIVOS
+    // =============================
+    function renderFiles() {
+      const ul = document.getElementById("fileList");
+      ul.innerHTML = "";
+
+      for (let f in fs.files) {
+        const li = document.createElement("li");
+        li.textContent = f;
+        li.onclick = () => openFile(f);
+        ul.appendChild(li);
+      }
+    }
+    renderFiles();
+
+    function detectLanguage(file) {
+      if (file.endsWith(".js")) return "javascript";
+      if (file.endsWith(".py")) return "python";
+      if (file.endsWith(".rs")) return "rust";
+      if (file.endsWith(".cpp")) return "cpp";
+      if (file.endsWith(".c")) return "c";
+      if (file.endsWith(".html")) return "html";
+      if (file.endsWith(".css")) return "css";
+      return "plaintext";
+    }
+
+    function openFile(name) {
+      currentFile = name;
+      const code = fs.get(name);
+      const lang = detectLanguage(name);
+      editor.setValue(code);
+      monaco.editor.setModelLanguage(editor.getModel(), lang);
+    }
+
+    // =============================
+    // SALVAR
+    // =============================
+    document.getElementById("saveBtn").onclick = () => {
+      fs.save(currentFile, editor.getValue());
+    };
+
+    // =============================
+    // NOVO ARQUIVO
+    // =============================
+    document.getElementById("newFileBtn").onclick = () => {
+      const name = prompt("Nome do arquivo (ex: script.js)");
+      if (!name) return;
+      fs.save(name, "");
+      openFile(name);
+    };
+
+    // =============================
+    // TERMINAL
+    // =============================
+    const term = document.getElementById("terminal");
+
+    function print(msg) {
+      term.textContent += msg + "
+";
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function clearTerm() {
+      term.textContent = "";
+    }
+
+    // =============================
+    // BOTÃO RODAR
+    // =============================
+    document.getElementById("runBtn").onclick = () => {
+      clearTerm();
+      const code = editor.getValue();
+      const lang = detectLanguage(currentFile);
+
+      print("Executando " + currentFile + "...
+");
+
+      if (lang === "javascript") {
+        try {
+          const result = eval(code);
+          if (result !== undefined) print(result);
+        } catch (e) {
+          print("Erro: " + e);
+        }
+      }
+
+      else if (lang === "html") {
+        const iframe = document.getElementById("previewFrame");
+        iframe.style.display = "block";
+        iframe.srcdoc = code;
+        print("Prévia HTML aberta!");
+      }
+
+      else {
+        print("Suporte WebAssembly será adicionado futuramente!");
+      }
+    };
+  </script></body>
+</html>
